@@ -17,7 +17,7 @@ func main() {
 	syscall.Chroot(os.Args[1])
 	syscall.Chdir("/")
 
-	cmd := exec.Command(os.Args[2])
+	cmd := exec.Command(os.Args[2:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
