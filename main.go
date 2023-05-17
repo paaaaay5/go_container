@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -35,10 +38,6 @@ func run() {
 		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
 	}
 
-	//
-	cmd.SysProcAttr.Cloneflags = syscall.CLONE_NEWUSER
-	cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(1), Gid: uint32(1)}
-
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Error starting the command - %s\n", err)
 		os.Exit(1)
@@ -49,6 +48,7 @@ func child() {
 	fmt.Printf("Child Running %v \n", os.Args[4])
 	rootfs := os.Args[2]
 	cgroupName := os.Args[3]
+	cg(cgroupName)
 	//rootディレクトリとカレントディレクトリをrootfsに設定
 	syscall.Chroot(rootfs)
 	syscall.Chdir("/")
@@ -65,6 +65,19 @@ func child() {
 	cmd.Run()
 }
 
-func cg() {
-
+func cg(cgroupName string) {
+	pid := os.Getpid()
+	cgroupPath := filepath.Join("/sys/fs/cgroup/cpu", cgroupName)
+	if err := os.Mkdir(cgroupPath, 0755); err != nil && !os.IsExist(err) {
+		fmt.Printf("Error creating cgroup - %s\n", err)
+		os.Exit(1)
+	}
+	if err := ioutil.WriteFile(filepath.Join(cgroupPath, "tasks"), []byte(strconv.Itoa(pid)), 0644); err != nil {
+		fmt.Printf("Error adding the process to the cgroup - %s\n", err)
+		os.Exit(1)
+	}
+	if err := ioutil.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_quota_us"), []byte("200000"), 0644); err != nil {
+		fmt.Printf("Error setting the CPU quota - %s\n", err)
+		os.Exit(1)
+	}
 }
